@@ -24,15 +24,17 @@ function minifyCSS($css) {
 }
 
 function minifyJS($js) {
-	preg_match_all('/(\"[^\"]*\"|\'[^\']*\'|`[^`]*`)/', $js, $matches);
+	preg_match_all('/("([^"\\\\]|\\\\.)*"|\'([^\'\\\\]|\\\\.)*\'|`([^`\\\\]|\\\\.)*`)/', $js, $matches);
 	$placeholders = [];
-	
+
 	foreach ($matches[0] as $i => $match) {
-		$placeholder = "__JS_STRING_".$i."__";
+		$placeholder = "__JS_STRING_" . $i . "__";
 		$js = str_replace($match, $placeholder, $js);
 		$placeholders[$placeholder] = $match;
 	}
 
+	$js = preg_replace('/\/\*.*?\*\//s', '', $js);
+	$js = preg_replace('/\/\/[^\n]*/', '', $js);
 	$js = preg_replace('/\s*([{}();,:+<>=|&!])\s*/', '$1', $js);
 	$js = preg_replace('/;\}/', '}', $js);
 	$js = preg_replace('/\s+/', ' ', $js);
@@ -40,28 +42,11 @@ function minifyJS($js) {
 
 	foreach ($placeholders as $placeholder => $original) {
 		if ($original[0] === '`') {
-			$htmlContent = substr($original, 1, -1);
-			
-			$htmlContent = preg_replace_callback(
-				'/<(pre|textarea|code)[^>]*>.*?<\/\1>/is',
-				function ($matches) {
-					return base64_encode($matches[0]);
-				},
-				$htmlContent
-			);
-
-			$htmlContent = preg_replace('/\s*>\s*/', '>', $htmlContent);
-			$htmlContent = preg_replace('/\s*</', '<', $htmlContent);
-
-			$htmlContent = preg_replace_callback(
-				'/[A-Za-z0-9+\/=]+/',
-				function ($matches) {
-					return base64_decode($matches[0]);
-				},
-				$htmlContent
-			);
-
-			$original = "`" . $htmlContent . "`";
+			$content = substr($original, 1, -1);
+			$content = preg_replace('/\s+/', ' ', $content);
+			$content = preg_replace('/\s*([<>])\s*/', '$1', $content);
+			$content = trim($content);
+			$original = "`" . $content . "`";
 		}
 		$js = str_replace($placeholder, $original, $js);
 	}
